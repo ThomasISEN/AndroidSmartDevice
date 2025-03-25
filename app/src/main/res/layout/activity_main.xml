@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp">
+
+    <!-- Icône -->
+    <ImageView
+        android:src="@mipmap/ic_launcher"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:contentDescription="App Icon" />
+
+    <!-- Titre -->
+    <TextView
+        android:text="Android Smart Device"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <!-- Description -->
+    <TextView
+        android:text="Cette application vous permet de scanner et interagir avec des appareils Bluetooth Low Energy à proximité."
+        android:textSize="16sp"
+        android:layout_marginTop="8dp"
+        android:textAlignment="center"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- Bouton Scan -->
+    <Button
+        android:id="@+id/scanButton"
+        android:text="Scanner les appareils BLE"
+        android:layout_marginTop="24dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+</LinearLayout>
