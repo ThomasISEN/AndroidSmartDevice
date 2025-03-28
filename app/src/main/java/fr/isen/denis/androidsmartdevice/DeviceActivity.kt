@@ -49,6 +49,10 @@ fun DeviceScreen(device: BluetoothDevice) {
     val isSubscribed = remember { mutableStateOf(false) }
     val compteurValue = remember { mutableStateOf<Int?>(null) }
 
+    var subscribed by remember { mutableStateOf(false) }
+    var lastValue by remember { mutableStateOf<String?>(null) }
+
+
 
     LaunchedEffect(device) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
@@ -90,22 +94,23 @@ fun DeviceScreen(device: BluetoothDevice) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(onClick = {
-                if (isSubscribed.value) {
-                    bleService.disableNotificationForButton3()
-                    isSubscribed.value = false
-                } else {
-                    bleService.enableNotificationForButton3 {
-                        compteurValue.value = it
+                if (!subscribed) {
+                    bleService.toggleNotificationsForButtons { value ->
+                        lastValue = value
                     }
-                    isSubscribed.value = true
+                } else {
+                    lastValue = null
+                    // Optionnel : ajout d'une méthode pour disableNotify si besoin
                 }
+                subscribed = !subscribed
             }) {
-                Text(if (isSubscribed.value) "Se désabonner" else "S'abonner au bouton 3")
+                Text(if (!subscribed) "S'abonner aux boutons" else "Se désabonner")
             }
 
-            if (isSubscribed.value && compteurValue.value != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Nombre reçu : ${compteurValue.value}")
+            Spacer(Modifier.height(16.dp))
+
+            lastValue?.let {
+                Text("Valeur du dernier appui : $it")
             }
 
         }

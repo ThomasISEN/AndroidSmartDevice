@@ -60,11 +60,9 @@ class ServiceBLE {
                 gatt: BluetoothGatt,
                 characteristic: BluetoothGattCharacteristic
             ) {
-                val value = characteristic.value
-                Log.i("NOTIFICATION", "Changement détecté : ${value.joinToString()}")
-                if (characteristic == button3Characteristic && value.isNotEmpty()) {
-                    onButton3ValueReceived?.invoke(value[0].toInt())
-                }
+                val value = characteristic.value.joinToString()
+                Log.i("NOTIFICATION", "Changement détecté : UUID=${characteristic.uuid}, valeur=$value")
+                onValueUpdate?.invoke(value)
             }
         })
     }
@@ -83,15 +81,31 @@ class ServiceBLE {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun enableNotificationForButton3(onValue: (Int) -> Unit) {
-        this.onButton3ValueReceived = onValue
-        val characteristic = bluetoothGatt
-            ?.services?.getOrNull(3)
-            ?.characteristics?.getOrNull(0)
-        button3Characteristic = characteristic
-        toggleNotify(true, characteristic, "bouton 3")
-        isSubscribedToButton3 = true
+    fun toggleNotificationsForButtons(onValueUpdate: (String) -> Unit): Boolean {
+        val service3 = bluetoothGatt?.services?.getOrNull(2)
+        val service4 = bluetoothGatt?.services?.getOrNull(3)
+
+        val charButton1 = service3?.characteristics?.getOrNull(1)
+        val charButton3 = service4?.characteristics?.getOrNull(0)
+
+        var allEnabled = false
+
+        listOf(charButton1 to "Bouton 1", charButton3 to "Bouton 3").forEach { (charac, label) ->
+            if (charac != null && isNotifiable(charac)) {
+                bluetoothGatt?.setCharacteristicNotification(charac, true)
+                val descriptor = charac.descriptors.firstOrNull()
+                descriptor?.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                bluetoothGatt?.writeDescriptor(descriptor)
+                Log.i("BLE", "Notification activée pour $label")
+                allEnabled = true
+            }
+        }
+
+        this.onValueUpdate = onValueUpdate
+        return allEnabled
     }
+    private var onValueUpdate: ((String) -> Unit)? = null
+
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun disableNotificationForButton3() {
