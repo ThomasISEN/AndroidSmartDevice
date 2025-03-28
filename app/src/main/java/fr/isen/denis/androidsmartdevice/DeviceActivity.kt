@@ -82,6 +82,15 @@ fun DeviceScreen(device: BluetoothDevice) {
             Button(onClick = { bleService.writeLed(3) }) {
                 Text("Allumer LED 3")
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(onClick = {
+                bleService.enableNotificationForButton3()
+            }) {
+                Text("S'abonner au bouton 3")
+            }
+
         }
     }
 }

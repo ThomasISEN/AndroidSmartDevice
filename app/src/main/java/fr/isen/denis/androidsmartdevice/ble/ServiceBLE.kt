@@ -11,7 +11,6 @@ class ServiceBLE {
 
     private var bluetoothGatt: BluetoothGatt? = null
     private var ledCharacteristic: BluetoothGattCharacteristic? = null
-    private val ledStates = mutableMapOf(1 to false, 2 to false, 3 to false)
 
     val ALL_BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
@@ -20,8 +19,8 @@ class ServiceBLE {
         )
     } else {
         arrayOf(
-            Manifest.permission.BLUETOOTH,
             Manifest.permission.BLUETOOTH_ADMIN,
+            Manifest.permission.BLUETOOTH,
             Manifest.permission.ACCESS_FINE_LOCATION
         )
     }
@@ -43,44 +42,62 @@ class ServiceBLE {
             override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     Log.i("BLE", "Services découverts")
-                    try {
-                        val service = gatt.services[2]
-                        val characteristic = service.characteristics[0]
-                        ledCharacteristic = characteristic
-                        Log.i("BLE", "Caractéristique LED trouvée (services[2].characteristics[0])")
+                    ledCharacteristic = gatt.services.getOrNull(2)?.characteristics?.getOrNull(0)
+                    if (ledCharacteristic != null) {
+                        Log.i("BLE", "Caractéristique LED trouvée")
                         onConnected()
-                    } catch (e: Exception) {
-                        Log.e("BLE", "Erreur accès caractéristique LED : ${e.message}")
+                    } else {
+                        Log.e("BLE", "Caractéristique LED non trouvée")
                     }
                 }
+            }
+
+            override fun onCharacteristicChanged(
+                gatt: BluetoothGatt,
+                characteristic: BluetoothGattCharacteristic
+            ) {
+                val value = characteristic.value
+                Log.i("NOTIFICATION", "Changement détecté : UUID=${characteristic.uuid}, valeur=${value.joinToString()}")
             }
         })
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun writeLed(ledId: Int) {
-        val gatt = bluetoothGatt
-        val characteristic = ledCharacteristic
-
-        if (gatt == null || characteristic == null) {
-            Log.e("BLE", "Impossible d’écrire : GATT ou caractéristique null")
+        val characteristic = ledCharacteristic ?: run {
+            Log.e("BLE", "Caractéristique LED non trouvée")
             return
         }
 
-        val isOn = ledStates[ledId] ?: false
-        val newValue = if (isOn) 0x00 else ledId
-
-        // Reset tous les états locaux
-        ledStates.keys.forEach { ledStates[it] = false }
-
-        // Active cette LED si elle est allumée
-        if (!isOn) {
-            ledStates[ledId] = true
-        }
-
-        characteristic.value = byteArrayOf(newValue.toByte())
-        val success = gatt.writeCharacteristic(characteristic)
-        Log.i("BLE", "Écriture LED $ledId → value=$newValue, success=$success")
+        val value = byteArrayOf(ledId.toByte())
+        characteristic.value = value
+        val result = bluetoothGatt?.writeCharacteristic(characteristic)
+        Log.i("BLE", "Commande LED $ledId → succès=$result")
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun enableNotificationForButton3() {
+        val characteristic = bluetoothGatt
+            ?.services?.getOrNull(3)
+            ?.characteristics?.getOrNull(0)
+
+        enableNotify(characteristic, "bouton 3")
+    }
+
+    private fun isNotifiable(characteristic: BluetoothGattCharacteristic): Boolean {
+        return characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun enableNotify(characteristic: BluetoothGattCharacteristic?, label: String) {
+        if (characteristic != null && isNotifiable(characteristic)) {
+            bluetoothGatt?.setCharacteristicNotification(characteristic, true)
+            val descriptor = characteristic.descriptors.firstOrNull()
+            descriptor?.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            bluetoothGatt?.writeDescriptor(descriptor)
+            Log.i("BLE", "Notification activée pour $label")
+        } else {
+            Log.e("BLE", "Impossible d'activer la notification pour $label")
+        }
+    }
 }
