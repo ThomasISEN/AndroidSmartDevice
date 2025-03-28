@@ -2,10 +2,6 @@ package fr.isen.denis.androidsmartdevice
 
 import android.Manifest
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothGatt
-import android.bluetooth.BluetoothGattCallback
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -19,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import fr.isen.denis.androidsmartdevice.ble.ServiceBLEFactory
 
 class DeviceActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.S)
@@ -46,56 +43,23 @@ class DeviceActivity : ComponentActivity() {
 fun DeviceScreen(device: BluetoothDevice) {
     val context = LocalContext.current
     var connectionState by remember { mutableStateOf("Non connecté") }
+    val bleService = remember { ServiceBLEFactory.getServiceBLEInstance() }
+    var connected by remember { mutableStateOf(false) }
 
-    // Récupère nom et adresse avec vérification de permission
-    val name = remember {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            device.name ?: "Nom inconnu"
-        } else {
-            "Nom non accessible"
-        }
-    }
-
-    val address = remember {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            device.address
-        } else {
-            "Adresse non accessible"
-        }
-    }
-
-    // Connexion BLE (si souhaitée)
     LaunchedEffect(device) {
-        try {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
-                == PackageManager.PERMISSION_GRANTED
-            ) {
-                connectionState = "Connexion en cours..."
-                device.connectGatt(context, false, object : BluetoothGattCallback() {
-                    override fun onConnectionStateChange(
-                        gatt: BluetoothGatt,
-                        status: Int,
-                        newState: Int
-                    ) {
-                        super.onConnectionStateChange(gatt, status, newState)
-                        connectionState = if (newState == BluetoothGatt.STATE_CONNECTED) {
-                            "Connecté à l'appareil"
-                        } else {
-                            "Déconnecté"
-                        }
-                    }
-                })
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
+            == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            connectionState = "Connexion en cours..."
+            bleService.connectToDevice(context, device) {
+                connectionState = "Connecté à l'appareil"
+                connected = true
             }
-        } catch (e: SecurityException) {
+        } else {
             connectionState = "Permission manquante pour se connecter"
         }
     }
 
-    // UI
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -103,11 +67,21 @@ fun DeviceScreen(device: BluetoothDevice) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Appareil sélectionné :", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        Text("Nom : $name")
-        Text("Adresse : $address")
-        Spacer(Modifier.height(16.dp))
-        Text(connectionState)
+        Text("État : $connectionState", style = MaterialTheme.typography.titleMedium)
+
+        if (connected) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = { bleService.writeLed(1) }) {
+                Text("Allumer LED 1")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = { bleService.writeLed(2) }) {
+                Text("Allumer LED 2")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(onClick = { bleService.writeLed(3) }) {
+                Text("Allumer LED 3")
+            }
+        }
     }
 }
