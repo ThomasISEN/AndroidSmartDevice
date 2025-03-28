@@ -12,6 +12,10 @@ class ServiceBLE {
     private var bluetoothGatt: BluetoothGatt? = null
     private var ledCharacteristic: BluetoothGattCharacteristic? = null
 
+    private var onButton3ValueReceived: ((Int) -> Unit)? = null
+    private var button3Characteristic: BluetoothGattCharacteristic? = null
+    private var isSubscribedToButton3 = false
+
     val ALL_BLE_PERMISSIONS = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         arrayOf(
             Manifest.permission.BLUETOOTH_CONNECT,
@@ -57,7 +61,10 @@ class ServiceBLE {
                 characteristic: BluetoothGattCharacteristic
             ) {
                 val value = characteristic.value
-                Log.i("NOTIFICATION", "Changement détecté : UUID=${characteristic.uuid}, valeur=${value.joinToString()}")
+                Log.i("NOTIFICATION", "Changement détecté : ${value.joinToString()}")
+                if (characteristic == button3Characteristic && value.isNotEmpty()) {
+                    onButton3ValueReceived?.invoke(value[0].toInt())
+                }
             }
         })
     }
@@ -76,17 +83,51 @@ class ServiceBLE {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun enableNotificationForButton3() {
+    fun enableNotificationForButton3(onValue: (Int) -> Unit) {
+        this.onButton3ValueReceived = onValue
         val characteristic = bluetoothGatt
             ?.services?.getOrNull(3)
             ?.characteristics?.getOrNull(0)
-
-        enableNotify(characteristic, "bouton 3")
+        button3Characteristic = characteristic
+        toggleNotify(true, characteristic, "bouton 3")
+        isSubscribedToButton3 = true
     }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun disableNotificationForButton3() {
+        toggleNotify(false, button3Characteristic, "bouton 3")
+        isSubscribedToButton3 = false
+        onButton3ValueReceived = null
+    }
+
+    fun isSubscribedToButton3() = isSubscribedToButton3
 
     private fun isNotifiable(characteristic: BluetoothGattCharacteristic): Boolean {
         return characteristic.properties and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0
     }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun toggleNotify(
+        enable: Boolean,
+        characteristic: BluetoothGattCharacteristic?,
+        label: String
+    ) {
+        if (characteristic != null && isNotifiable(characteristic)) {
+            bluetoothGatt?.setCharacteristicNotification(characteristic, enable)
+            val descriptor = characteristic.descriptors.firstOrNull()
+            descriptor?.value = if (enable)
+                BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            else
+                BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            bluetoothGatt?.writeDescriptor(descriptor)
+            Log.i("BLE", "Notification ${if (enable) "activée" else "désactivée"} pour $label")
+        } else {
+            Log.e("BLE", "Impossible de modifier la notification pour $label")
+        }
+    }
+
+
+
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun enableNotify(characteristic: BluetoothGattCharacteristic?, label: String) {

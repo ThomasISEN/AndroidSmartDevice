@@ -46,6 +46,10 @@ fun DeviceScreen(device: BluetoothDevice) {
     val bleService = remember { ServiceBLEFactory.getServiceBLEInstance() }
     var connected by remember { mutableStateOf(false) }
 
+    val isSubscribed = remember { mutableStateOf(false) }
+    val compteurValue = remember { mutableStateOf<Int?>(null) }
+
+
     LaunchedEffect(device) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT)
             == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -86,11 +90,25 @@ fun DeviceScreen(device: BluetoothDevice) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(onClick = {
-                bleService.enableNotificationForButton3()
+                if (isSubscribed.value) {
+                    bleService.disableNotificationForButton3()
+                    isSubscribed.value = false
+                } else {
+                    bleService.enableNotificationForButton3 {
+                        compteurValue.value = it
+                    }
+                    isSubscribed.value = true
+                }
             }) {
-                Text("S'abonner au bouton 3")
+                Text(if (isSubscribed.value) "Se désabonner" else "S'abonner au bouton 3")
+            }
+
+            if (isSubscribed.value && compteurValue.value != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Nombre reçu : ${compteurValue.value}")
             }
 
         }
+
     }
 }
